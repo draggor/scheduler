@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="us">
+<head>
+	<meta charset="utf-8">
+	<title></title>
+	<link href="css/cupertino/jquery-ui-1.10.3.custom.css" rel="stylesheet">
+	<link href="scheduler.css" rel="stylesheet">
+	<script src="js/jquery-1.9.1.js"></script>
+	<script src="js/jquery-ui-1.10.3.custom.js"></script>
+	<script src="scheduler.js"></script>
+</head>
+<body>
+
+<div class="float">
+	<input type="button" value=" + " class="time-label" id="add" />
+</div>
+<div class="top-header" id="day-label">
+</div>
+<div class="top-header" id="time-label">
+</div>
+<div class="room-container" id="rooms">
+</div>
+
+<div id="dialog" style="display:none" title="Add Event">
+<p>Enter your event info</p>
+<form>
+<fieldset>
+	<label for="event_name">Event Name</label>
+	<input type="text" name="event_name" class="text ui-widget-content ui-corner-all" />
+	<label for="duration">Duration in Hours</label>
+	<input type="text" name="duration" class="text ui-widget-content ui-corner-all" />
+	<label for="host">Panel Host</label>
+	<select name="host">
+	</select>
+	<label for="add_host">Add Host</label>
+	<input type="button" name="add_host" data-reset="false" value="+" />
+</fieldset>
+</form>
+</div>
+
+<div id="addhostdialog" style="display:none" title="Add Host">
+<form>
+<fieldset>
+<label for="add_host">Add Host</label>
+<input type="text" name="add_host" class="text ui-widget-content ui-corner-all" />
+</fieldset>
+</form>
+</div>
+
+</body>
+</html>
