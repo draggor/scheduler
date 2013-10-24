@@ -1,2 +1,4 @@
 *.swp
 *.bu
+
+node_modules/

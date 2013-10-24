@@ -1,6 +1,12 @@
-var dialogFieldObjs;
-var positions = {};
-var hosts = {};
+var DIALOG_FIELDS;
+var POSITIONS = {};
+var HOSTS = {};
+var CMD = {};
+var OVERLAP = new Array(122);
+
+for(var i = 0; i < OVERLAP.length; i++) {
+	OVERLAP[i] = {};
+}
 
 $(function() {
 	timeLabel();
@@ -12,8 +18,12 @@ $(function() {
 	}
 	$('#add').click(addEventDialog);
 	$('#dialog input[name="add_host"]').click(addHostDialog);
-	dialogFieldObjs = getDialogFields();
+	DIALOG_FIELDS = getDialogFields();
 });
+
+function send(msg) {
+	CMD[msg[0]].apply(null, msg[1]);
+}
 
 var getId = (function() {
 	var cnt = 0;
@@ -34,7 +44,7 @@ function getDialogFields() {
 }
 
 function wrapDialogField(field) {
-	var val = function() { return field.val(); }
+	var val = function(v) { return v ? field.val(v) : field.val(); }
 	  , reset = function() { field.val('').removeClass('ui-state-error'); }
 	  , tagName = field.prop('tagName')
 	  , inputType = field.attr('type')
@@ -50,13 +60,24 @@ function wrapDialogField(field) {
 	return {val: val, reset: reset};
 }
 
+function populateFields(id) {
+	var item = POSITIONS[id];
+	DIALOG_FIELDS.event_name.val(item.name);
+	DIALOG_FIELDS.host.val(item.host);
+	DIALOG_FIELDS.duration.val(item.time);
+}
+
 function addEventDialog() {
-	var self = this;
+	var self = this
+	  , newEvent = addEvent.call(self)
+	  , created = false
+	  ;
 	$('#dialog').dialog({
 		modal: true
 	,	buttons: {
 			Create: function() {
-				addEvent.call(self, dialogFieldObjs);
+				editEvent(newEvent, DIALOG_FIELDS);
+				created = true;
 				$(this).dialog("close");
 			}
 		,	Cancel: function() {
@@ -64,7 +85,30 @@ function addEventDialog() {
 			}
 		}
 	,	close: function() {
-			$.each(dialogFieldObjs, function(i, v) { this.reset(); });
+			$.each(DIALOG_FIELDS, function(i, v) { this.reset(); });
+			if(!created) {
+				newEvent.remove();
+			}
+		}
+	});
+}
+
+function editEventDialog() {
+	var self = $(this);
+	populateFields(self.attr('id'));
+	$('#dialog').dialog({
+		modal: true
+	,	buttons: {
+			Save: function() {
+				editEvent(self, DIALOG_FIELDS);
+				$(this).dialog("close");
+			}
+		,	Cancel: function() {
+				$(this).dialog("close");
+			}
+		}
+	,	close: function() {
+			$.each(DIALOG_FIELDS, function(i, v) { this.reset(); });
 		}
 	});
 }
@@ -80,12 +124,10 @@ function addHostDialog() {
 				var host = input.val()
 				  , lower = host.toLowerCase()
 				  ;
-				if(hosts[lower]) {
+				if(HOSTS[lower]) {
 					input.addClass('ui-state-error');
 				} else {
-					hosts[lower] = host;
-					hostSelect.append($('<option>', {value:host}).html(host));
-					$(this).dialog('close');
+					send(['add_host', [host, lower]]);
 				}
 			}
 		,	Cancel: function() {
@@ -98,6 +140,19 @@ function addHostDialog() {
 	});
 }
 
+CMD.add_host = function(host, lower) {
+	var input = $('#addhostdialog input')
+	  , hostSelect = $('#dialog select[name="host"]');
+	  ;
+	if(HOSTS[lower]) {
+		input.addClass('ui-state-error');
+	} else {
+		HOSTS[lower] = host;
+		hostSelect.append($('<option>', {value:host}).html(host));
+		$('#addhostdialog').dialog('close');
+	}
+};
+
 function getWidth(duration) {
 	var d = parseFloat(duration);
 	if(!d) {
@@ -106,48 +161,102 @@ function getWidth(duration) {
 	return Math.floor(160.0 * d);
 }
 
+function getSlotPosition(left) {
+	return Math.floor((left - 168) / 80);
+}
+
+function getSlots(time) {
+	var s = Math.ceil(time/.5);
+	return isNaN(s) || s === 0 ? 1 : s;
+}
+
 function store(item) {
 	var json = {
-		top: item.css('top')
-	,	left: item.css('left')
+		top: parseInt(item.css('top').slice(0, -2))
+	,	left: parseInt(item.css('left').slice(0, -2))
 	,	name: item.data('name')
 	,	time: item.data('time')
+	,	host: item.data('host')
 	};
-	positions[item.attr('id')] = json;
+	POSITIONS[item.attr('id')] = json;
 	return item;
 }
 
-function makeEvent(dialogFields) {
+function editEvent(e, dialogFields) {
 	var data = {
 		name: dialogFields.event_name.val()
-	,	time: dialogFields.duration.val()
-	,	hasmoved: false
-	,	id: 'eventid' + getId()
+	,	time: parseFloat(dialogFields.duration.val())
+	,	host: dialogFields.host.val()
 	};
+	data.time = isNaN(data.time) ? .5 : data.time;
+	console.log(data.time);
 	var css = {
 		width: getWidth(data.time)
 	};
-	var item = $('<div>', {id:data.id}).addClass('border-label').html(data.name).data(data).css(css);
-	store(item);
-	return item;
-}
-
-function addEvent(dialogFields) {
-	var newEvent = makeEvent(dialogFields);
-	$(this).after(newEvent);
-	newEvent.draggable({
+	e.html(data.name).data(data).css(css);
+	e.draggable({
 		grid: [80,20]
 	,	appendTo: 'body'
+	,	helper: function() { return $('<div>').addClass('border-label').html(data.name).css(css).css({background:'gray'}); }
 	,	stop: function(event, ui) {
-			$(event.target).css({
-				position:'absolute'
-			,	top: ui.position.top
-			,	left: ui.position.left
-			});
-			store($(event.target));
+			send(['move', [$(event.target).attr('id'), ui.position.top, ui.position.left]]);
 		}
 	});
+	store(e);
+	return e;
 }
+
+function addEvent() {
+	var data = {
+		hasmoved: false
+	,	id: 'eventid' + getId()
+	};
+	var css = {
+		width: getWidth(.5)
+	};
+	var newEvent = $('<div>', {id:data.id}).addClass('border-label').html(data.name).data(data).css(css);
+	$(this).after(newEvent);
+	newEvent.dblclick(editEventDialog);
+	return newEvent;
+}
+
+CMD.move = function(id, top, left) {
+	var old = POSITIONS[id]
+	  , curr = $('#' + id)
+	  , slotp = getSlotPosition(old.left)
+	  , slots = old ? getSlots(old.time) : getSlots(curr.data('time'))
+	  , host = old.host
+	  ;
+	if(old && slotp >= 0) {
+		curr.removeClass('conflict');
+		for(var i = slotp; i < slotp + slots; i++) {
+			OVERLAP[i][host] = OVERLAP[i][host].filter(function(v) { return v !== id; });
+			if(OVERLAP[i][host].length === 1) {
+				$('#' + OVERLAP[i][host][0]).removeClass('conflict');
+			}
+		}
+	}
+
+	store($('#' + id).css({
+		position:'absolute'
+	,	top: top
+	,	left: left
+	}))
+
+	slotp = getSlotPosition(left);
+	for(var i = slotp; i < slotp + slots; i++) {
+		if(OVERLAP[i][host]) {
+			OVERLAP[i][host].push(id);
+			if(Object.keys(OVERLAP[i][host]).length >= 2) {
+				$.each(OVERLAP[i][host], function(index, value) {
+					$('#' + value).addClass('conflict');
+				});
+			}
+		} else {
+			OVERLAP[i][host] = [id];
+		}
+	}
+};
 
 function blankLabel() {
 	return $('<span>').addClass('time-label').html('&nbsp');
