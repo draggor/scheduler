@@ -49,7 +49,7 @@ function wrapDialogField(field) {
 	  , tagName = field.prop('tagName')
 	  , inputType = field.attr('type')
 	  ;
-	console.log(tagName + ' ' + inputType);
+	//console.log(tagName + ' ' + inputType);
 	if (tagName == 'SELECT') {
 		
 	} else if (tagName == 'INPUT') {
@@ -235,7 +235,6 @@ function addEvent() {
 }
 
 function overlapRemove(id, ev, old, slotp, slots) {
-	console.log(arguments);
 	var host = old.host;
 	ev.removeClass('conflict');
 	for(var i = slotp; i < slotp + slots; i++) {
