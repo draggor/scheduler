@@ -68,16 +68,11 @@ function populateFields(id) {
 }
 
 function addEventDialog() {
-	var self = this
-	  , newEvent = addEvent.call(self)
-	  , created = false
-	  ;
 	$('#dialog').dialog({
 		modal: true
 	,	buttons: {
 			Create: function() {
-				editEvent(newEvent, DIALOG_FIELDS);
-				created = true;
+				editEvent(-1, DIALOG_FIELDS);
 				$(this).dialog("close");
 			}
 		,	Cancel: function() {
@@ -86,9 +81,6 @@ function addEventDialog() {
 		}
 	,	close: function() {
 			$.each(DIALOG_FIELDS, function(i, v) { this.reset(); });
-			if(!created) {
-				newEvent.remove();
-			}
 		}
 	});
 }
@@ -100,7 +92,7 @@ function editEventDialog() {
 		modal: true
 	,	buttons: {
 			Save: function() {
-				editEvent(self, DIALOG_FIELDS);
+				editEvent(self.attr('id'), DIALOG_FIELDS);
 				$(this).dialog("close");
 			}
 		,	Cancel: function() {
@@ -182,17 +174,39 @@ function store(item) {
 	return item;
 }
 
-function editEvent(e, dialogFields) {
+function editEvent(id, dialogFields) {
+	var name = dialogFields.event_name.val()
+	  , time = parseFloat(dialogFields.duration.val())
+	  , host = dialogFields.host.val()
+	  ;
+	time = isNaN(time) ? .5 : time;
+	send(['edit', [id, name, time, host]]);
+}
+
+CMD.edit = function(id, name, time, host) {
 	var data = {
-		name: dialogFields.event_name.val()
-	,	time: parseFloat(dialogFields.duration.val())
-	,	host: dialogFields.host.val()
+		name: name
+	,	time: time
+	,	host: host
 	};
-	data.time = isNaN(data.time) ? .5 : data.time;
-	console.log(data.time);
 	var css = {
-		width: getWidth(data.time)
+		width: getWidth(time)
 	};
+	var e;
+	if(id === -1) {
+		e = addEvent.call($('#add'));
+	} else {
+		e = $('#' + id);
+		var old = POSITIONS[id];
+		if(old.host !== host || old.time !== time) {
+			var slotp = getSlotPosition(old.left)
+			  , slots = getSlots(old.time)
+			  ;
+			overlapRemove(id, e, old, slotp, slots);
+			slots = getSlots(time);
+			overlapAdd(id, host, slotp, slots);
+		}
+	}
 	e.html(data.name).data(data).css(css);
 	e.draggable({
 		grid: [80,20]
@@ -220,30 +234,19 @@ function addEvent() {
 	return newEvent;
 }
 
-CMD.move = function(id, top, left) {
-	var old = POSITIONS[id]
-	  , curr = $('#' + id)
-	  , slotp = getSlotPosition(old.left)
-	  , slots = old ? getSlots(old.time) : getSlots(curr.data('time'))
-	  , host = old.host
-	  ;
-	if(old && slotp >= 0) {
-		curr.removeClass('conflict');
-		for(var i = slotp; i < slotp + slots; i++) {
-			OVERLAP[i][host] = OVERLAP[i][host].filter(function(v) { return v !== id; });
-			if(OVERLAP[i][host].length === 1) {
-				$('#' + OVERLAP[i][host][0]).removeClass('conflict');
-			}
+function overlapRemove(id, ev, old, slotp, slots) {
+	console.log(arguments);
+	var host = old.host;
+	ev.removeClass('conflict');
+	for(var i = slotp; i < slotp + slots; i++) {
+		OVERLAP[i][host] = OVERLAP[i][host].filter(function(v) { return v !== id; });
+		if(OVERLAP[i][host].length === 1) {
+			$('#' + OVERLAP[i][host][0]).removeClass('conflict');
 		}
 	}
+}
 
-	store($('#' + id).css({
-		position:'absolute'
-	,	top: top
-	,	left: left
-	}))
-
-	slotp = getSlotPosition(left);
+function overlapAdd(id, host, slotp, slots) {
 	for(var i = slotp; i < slotp + slots; i++) {
 		if(OVERLAP[i][host]) {
 			OVERLAP[i][host].push(id);
@@ -256,6 +259,27 @@ CMD.move = function(id, top, left) {
 			OVERLAP[i][host] = [id];
 		}
 	}
+}
+
+CMD.move = function(id, top, left) {
+	var old = POSITIONS[id]
+	  , curr = $('#' + id)
+	  , slotp = getSlotPosition(old.left)
+	  , slots = old ? getSlots(old.time) : getSlots(curr.data('time'))
+	  , host = old.host
+	  ;
+	if(old && slotp >= 0) {
+		overlapRemove(id, curr, old, slotp, slots);
+	}
+
+	store($('#' + id).css({
+		position:'absolute'
+	,	top: top
+	,	left: left
+	}))
+
+	slotp = getSlotPosition(left);
+	overlapAdd(id, host, slotp, slots);
 };
 
 function blankLabel() {
