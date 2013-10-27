@@ -105,19 +105,18 @@ CMD.edit = function(id, name, time, host) {
 	e.draggable({
 		grid: [80,20]
 	,	appendTo: 'body'
-	,	revert: false
+	,	revert: 'invalid'
+	,	revertDuration: 0
 	,	helper: function() {
 			return $('<div>').addClass('border-label').html(data.name).css(css).css({background:'gray'});
 		}
-	,	start: function(event, ui) {
-			ui.helper.data('original-position', ui.helper.offset());
+	}).droppable({
+		accept: '.border-label'
+	,	over: function(event, ui) {
+			ui.helper.data('revert', true);
 		}
-	,	stop: function(event, ui) {
-			if(ui.position.top < 68 || ui.position.left < 168) {
-				ui.helper.offset(ui.helper.data('original-position'));
-			} else {
-				send(['move', [$(event.target).attr('id'), ui.position.top, ui.position.left]]);
-			}
+	,	out: function(event, ui) {
+			ui.helper.data('revert', false);
 		}
 	});
 	store(e);
@@ -154,7 +153,21 @@ $(function() {
 	for(var i in rooms) {
 		$('#time-label').after($('<div>').addClass('room-highlight'));
 		$('#rooms').append($('<div>').addClass('room-label').html(rooms[i]));
+		$('#time-label').after($('<div>').addClass('room-highlight'));
+		$('#rooms').append($('<div>').addClass('room-label').html(rooms[i]));
 	}
+	$('div.room-highlight').each(function() {
+		$(this).droppable({
+			accept: '.border-label'
+		,	drop: function(event, ui) {
+				if(ui.helper.data('revert') || (ui.position.top < 68 || ui.position.left < 168)) {
+					//we used to have to move the helper back to its origin here, now we just do nothing.
+				} else {
+					send(['move', [ui.draggable.attr('id'), ui.position.top, ui.position.left]]);
+				}
+			}
+		});
+	});
 	$('#add').click(addEventDialog);
 	$('#dialog input[name="add_host"]').click(addHostDialog);
 	DIALOG_FIELDS = getDialogFields();
@@ -286,6 +299,7 @@ function editEvent(id, dialogFields) {
 function addEvent() {
 	var data = {
 		hasmoved: false
+	,	revert: false
 	,	id: 'eventid' + getId()
 	};
 	var css = {

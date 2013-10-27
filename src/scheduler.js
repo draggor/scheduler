@@ -5,7 +5,21 @@ $(function() {
 	for(var i in rooms) {
 		$('#time-label').after($('<div>').addClass('room-highlight'));
 		$('#rooms').append($('<div>').addClass('room-label').html(rooms[i]));
+		$('#time-label').after($('<div>').addClass('room-highlight'));
+		$('#rooms').append($('<div>').addClass('room-label').html(rooms[i]));
 	}
+	$('div.room-highlight').each(function() {
+		$(this).droppable({
+			accept: '.border-label'
+		,	drop: function(event, ui) {
+				if(ui.helper.data('revert') || (ui.position.top < 68 || ui.position.left < 168)) {
+					//we used to have to move the helper back to its origin here, now we just do nothing.
+				} else {
+					send(['move', [ui.draggable.attr('id'), ui.position.top, ui.position.left]]);
+				}
+			}
+		});
+	});
 	$('#add').click(addEventDialog);
 	$('#dialog input[name="add_host"]').click(addHostDialog);
 	DIALOG_FIELDS = getDialogFields();
@@ -137,6 +151,7 @@ function editEvent(id, dialogFields) {
 function addEvent() {
 	var data = {
 		hasmoved: false
+	,	revert: false
 	,	id: 'eventid' + getId()
 	};
 	var css = {
